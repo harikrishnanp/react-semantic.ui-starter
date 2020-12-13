@@ -1,51 +1,46 @@
 import path from 'path'
-import fs from 'fs'
 import webpack from 'webpack'
+import rimraf from 'rimraf'
 import config from '../config'
 import isomorphicWebpackConfig from '../webpack.isomorphic'
-import child_process from 'child_process'
-import _ from 'lodash'
-import I18nPlugin from 'i18n-webpack-plugin'
+import nodeExternals from 'webpack-node-externals'
+const {SENTRY_DSN, CLIENT_STATIC_PATH, CLIENT_ASSETS_MANIFEST, isProduction, publicPath} = config
 
-const exec = child_process.execSync
-const {
-	SENTRY_DSN,
-	DIST_PATH,
-	APP_LANGUAGE,
-	JWT_SECRET,
-	ANALYZE_BUNDLE,
-	PORT
-} = config
-
-// Cleare dist dir before run
-exec(`rm -rf ${config.distPath}/server/${APP_LANGUAGE}`)
+// Clear dist dir before run
+rimraf(`${config.distPath}/server`, {}, () => {})
 
 const definePluginArgs = {
 	'process.env.BROWSER': JSON.stringify(false),
-	'process.env.PORT': JSON.stringify(PORT),
-	'process.env.JWT_SECRET': JSON.stringify(JWT_SECRET),
 	'process.env.SENTRY_DSN': JSON.stringify(SENTRY_DSN),
-	'process.env.DIST_PATH': JSON.stringify(DIST_PATH)
+	'process.env.CLIENT_STATIC_PATH': JSON.stringify(CLIENT_STATIC_PATH),
+	'process.env.CLIENT_ASSETS_MANIFEST': JSON.stringify(CLIENT_ASSETS_MANIFEST)
 }
 
-let nodeModules = {}
-fs
-	.readdirSync('node_modules')
-	.filter(function (x) {
-		return ['.bin'].indexOf(x) === -1
-	})
-	.forEach(function (mod) {
-		nodeModules[mod] = 'commonjs ' + mod
-	})
+const devtool = isProduction ? 'cheap-source-map' : 'eval'
+const chunkFilename = isProduction ? '[name].[chunkhash:6].js' : '[name].js'
 
 const baseWebpackConfig = {
-	entry: [path.join(config.srcPath, './server/index')],
+	name: 'server',
+	entry: config.srcPath,
+	devtool,
 	target: 'node',
 	output: {
-		path: path.join(config.distPath, './server', APP_LANGUAGE),
-		filename: 'index.js'
+		path: path.join(config.distPath, './server'),
+		filename: 'index.js',
+		chunkFilename,
+		publicPath
 	},
-	externals: nodeModules,
+	externals: [
+		nodeExternals({
+			whitelist: [
+				!isProduction ? 'webpack/hot/poll?300' : null,
+				/\.(eot|woff|woff2|ttf|otf)$/,
+				/\.(svg|png|jpg|jpeg|gif|ico)$/,
+				/\.(mp4|mp3|ogg|swf|webp)$/,
+				/\.(css|scss|sass|sss|less)$/
+			].filter(x => x)
+		})
+	],
 	performance: {
 		hints: false
 	},
@@ -55,46 +50,34 @@ const baseWebpackConfig = {
 		alias: isomorphicWebpackConfig.resolve.alias
 	},
 	module: {
-		rules: isomorphicWebpackConfig.module.rules.concat([
-			// NOTE: LQIP loader doesn't work with file-loader and url-loader :(
-			// `npm i --save-dev lqip-loader`
-			// {
-			//   test: /\.(jpe?g|png)$/i,
-			//   enforce: 'pre',
-			//   loaders: [
-			//     {
-			//       loader: 'lqip-loader',
-			//       options: {
-			//         path: '/images-lqip', // your image going to be in media folder in the output dir
-			//         name: '[name]-lqip.[hash:8].[ext]' // you can use [hash].[ext] too if you wish
-			//       }
-			//     }
-			//   ]
-			// }
+		rules: isomorphicWebpackConfig.module.rules.concat(
 			{
 				test: /\.(jpe?g|png|gif|svg)$/,
 				use: [
 					{
 						loader: 'url-loader',
 						options: {
-							limit: 25000,
-							name: 'images/[name].[hash:8].[ext]'
+							limit: 4096,
+							name: 'images/[name].[hash:6].[ext]',
+							emitFile: false
 						}
-					},
-					'img-loader'
+					}
 				]
 			}
-		])
+		)
 	},
 	plugins: isomorphicWebpackConfig.plugins.concat([
-		new webpack.NormalModuleReplacementPlugin(
-			/\.(css|sass|less|scss)$/,
-			'node-noop'
-		),
-		new webpack.DefinePlugin(definePluginArgs)
+		new webpack.DefinePlugin(definePluginArgs),
+		new webpack.optimize.LimitChunkCountPlugin({
+			maxChunks: 1
+		}),
+		// ignore styles, because server hasn't got style-loader
+		new webpack.NormalModuleReplacementPlugin(/\.(css|sass|less|scss|sss)$/, 'node-noop')
 	]),
 	node: {
 		__dirname: true,
+		__filename: true,
+		console: true,
 		global: true
 	}
 }

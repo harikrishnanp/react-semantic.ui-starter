@@ -1,40 +1,60 @@
-import requestWrapper from './xhr_wrapper'
-
-// EXPORT NORMALIZE STUFF!
-export {normalizeArrayOfItems} from './normalize'
-// Create request wrappers
-export const get = requestWrapper('GET')
-export const post = requestWrapper('POST')
-export const put = requestWrapper('PUT')
-export const patch = requestWrapper('PATCH')
-export const del = requestWrapper('DELETE')
-// USAGE:
-// get('https://www.google.com', {
-//     Authorization: 'JWT LOL',
-//     headers: {
-//         'Content-Type': 'text/cooltext'
-//     }
-// })
-
-// Utils for response normalization
-
-// FUNCTION WITH SIDE-EFFECTS
 /**
- * `parseJSON()` adds property "ok"
- * that identicates that response is OK
- *
- * `resultOK`removes result.ok from result and returns "ok" property
- *  It widely used in `/actions/*`
- *  for choosing action to dispatch after request to API
- *
- * @param  {Object} result - response result that
- * @return {bool} - indicates was request successful or not
+ * @flow
+ * @file Simple fetch wrapper
  */
-export function resultOK (result) {
-	if (result) {
-		const ok = result.ok
-		delete result.ok
-		return ok // Look at parseJSON
+import fetch from 'isomorphic-fetch'
+
+// USAGE:
+export const get = requestWrapper('GET')
+// get('https://www.google.com')
+export const post = requestWrapper('POST')
+// post('https://www.google.com', data)
+
+// Create request wrapper for certain method
+function requestWrapper (method: 'GET' | 'POST' | 'DELETE' | 'PUT' | 'PATCH') {
+	// Creates request to `url` with `data`
+	return async (url: string, data: any = null) => {
+		const body = data ? {body: JSON.stringify(data)} : {}
+
+		const request = {
+			method,
+			headers: {},
+			mode: process.env.NODE_ENV === 'development' ? 'cors' : 'same-origin',
+			...body
+		}
+
+		return fetch(url, request)
+			// .then(checkStatus)
+			.then(parseJSON)
+			.catch((err: any) => err)
 	}
-	return false
 }
+
+async function parseJSON (res: Response): Object {
+	const data = await res.json()
+	const {status, ok} = res
+	return {data, ok, status}
+}
+// Could save you some time:
+// function checkStatus (response: Response): Response {
+// 	const {status} = response
+// 	if (status >= 200 && status < 300) {
+// 		// Everything is ok
+// 	} else if (status >= 300 && status < 400) {
+// 		// 300 - Multiple Choices
+// 		// 301 - Moved Permanently,
+// 		// 302 - Found, Moved Temporarily
+// 		// 304 - not modified
+// 		// 307 - Temporary Redirect
+// 	} else if (status === 400) {
+// 		// Probably is a validation error
+// 	} else if (status === 403 || status === 401) {
+// 		// 401 - Forbidden
+// 		// 403 - Unauthorized
+// 	} else if (status === 404) {
+// 		// Not Found
+// 	} else if (status >= 500) {
+// 		// Server error
+// 	}
+// 	return response
+// }

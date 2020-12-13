@@ -1,69 +1,87 @@
-import {Route} from 'react-router-dom'
-import {Users, Dashboard, Login} from 'containers'
-import RouteAuth from 'components/addons/RouteAuth'
+// @flow
+import React from 'react'
 import {createBrowserHistory, createMemoryHistory} from 'history'
+import {asyncComponent} from 'react-async-component'
+import {Loader, Dimmer, Header, Icon} from 'semantic-ui-react'
+import _ from 'lodash'
+import Dashboard from 'containers/Dashboard'
+import Links from 'containers/Links'
 
-export const history = getHistory()
+function asyncComponentCreator (url) {
+	return asyncComponent({
+		resolve: () => {
+			if (!process.env.BROWSER) {
+				// flow-disable-next-line
+				return require(`containers/${url}/index.jsx`).default
+			}
+			// flow-disable-next-line: The parameter passed to import() must be a literal string
+			return import(/* webpackChunkName:"[index].[request]" */ `containers/${url}/index.jsx`)
+		},
+		LoadingComponent () {
+			return (
+				<Dimmer active>
+					<Loader size="large" active>
+						Loading page...
+					</Loader>
+				</Dimmer>
+			)
+		},
+		ErrorComponent () {
+			return (
+				<Dimmer active>
+					<Header inverted as="h2" icon textAlign="center">
+						<Icon name="refresh" />
+						Refresh
+						<Header.Subheader>Got error while loading page.</Header.Subheader>
+					</Header>
+				</Dimmer>
+			)
+		},
+		autoResolveES2015Default: true,
+		env: process.env.BROWSER ? 'browser' : 'node',
+		serverMode: 'resolve'
+	})
+}
 
-const loadLazyComponent = url => {
-	return async cb => {
-		// NOTE: there isn't any duplication here
-		// Read Webpack docs about code-splitting for more info.
-		if (process.env.BROWSER) {
-			const loadComponent = await import(/* webpackMode: "lazy-once", webpackChunkName: "lazy-containers" */ `containers/${url}/index.jsx`)
-			return loadComponent
+function routingFnCreator (useFor) {
+	// const AsyncNotFound = asyncComponentCreator('NotFound')
+	// Dashboard and Links included in build
+	// NotFound(404) is lazy
+	const routes: any[] = [
+		{
+			path: '/',
+			exact: true,
+			component: Dashboard,
+			name: 'Dashboard'
+		},
+		{
+			path: '/links',
+			exact: true,
+			component: Links,
+			name: 'Links'
+		},
+		{
+			component: asyncComponentCreator('NotFound'),
+			name: '404'
 		}
-		const loadComponent = await import(/* webpackMode: "eager", webpackChunkName: "lazy-containers" */ `containers/${url}/index.jsx`)
-		return loadComponent
+	]
+
+	const fns = {
+		// Returns routing for React-Router
+		routing () {
+			return routes.map(a => _.pick(a, ['path', 'strict', 'exact', 'component', 'lazy']))
+		},
+		// Returns `name` + `path`. used in Header
+		meta () {
+			return routes.map(a => _.pick(a, ['path', 'name', 'exact', 'strict']))
+		}
 	}
+
+	return fns[useFor]
 }
 
-export const routes = [
-	{
-		path: '/',
-		exact: true,
-		icon: 'newspaper',
-		name: 'Dashboard',
-		sidebarVisible: true,
-		tag: RouteAuth,
-		component: Dashboard
-	},
-	{
-		path: '/users',
-		name: 'Users',
-		exact: true,
-		icon: 'users',
-		sidebarVisible: true,
-		tag: RouteAuth,
-		component: Users
-	},
-	{
-		external: true,
-		path: 'https://github.com/Metnew/react-semantic.ui-starter',
-		icon: 'github',
-		name: 'Github',
-		sidebarVisible: true
-	},
-	{
-		path: '/auth',
-		name: 'Auth',
-		tag: Route,
-		component: Login
-	},
-	{
-		path: '/users/:id',
-		name: 'User',
-		lazy: true,
-		exact: true,
-		tag: RouteAuth,
-		component: loadLazyComponent('UserItem')
-	}
-]
+const createRequiredHistory = process.env.BROWSER ? createBrowserHistory : createMemoryHistory
 
-function getHistory () {
-	const basename = ''
-	if (process.env.BROWSER !== true) {
-		return createMemoryHistory()
-	}
-	return createBrowserHistory({basename})
-}
+export const getMetaRoutes = routingFnCreator('meta')
+export const getRouterRoutes = routingFnCreator('routing')
+export const history = createRequiredHistory()

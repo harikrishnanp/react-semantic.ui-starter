@@ -1,25 +1,23 @@
-import path from 'path'
-import webpack from 'webpack'
-// import _ from 'lodash'
-import config from '../config'
 import baseWebpackConfig from './webpack.base'
-import WebpackShellPlugin from 'webpack-shell-plugin'
-import FriendlyErrors from 'friendly-errors-webpack-plugin'
+import StartServerPlugin from 'start-server-webpack-plugin'
+import webpack from 'webpack'
+import config from '../config'
 
+const {CLIENT_ASSETS_MANIFEST, INSPECT_ENABLED} = config
+const inspectEnabled = INSPECT_ENABLED ? ['--inspect'] : []
+const nodeArgs = ['-r', 'source-map-support/register', ...inspectEnabled]
 const plugins = [
-	new WebpackShellPlugin({
-		onBuildEnd: [`nodemon ${path.join(config.distPath, '/server', config.APP_LANGUAGE)}`]
+	new webpack.HotModuleReplacementPlugin(),
+	new StartServerPlugin({
+		name: 'index.js',
+		nodeArgs
 	}),
-	// new webpack.HotModuleReplacementPlugin(),
-	new webpack.NoEmitOnErrorsPlugin(),
-	new FriendlyErrors()
+	// Ignore assets.json to avoid infinite recompile bug
+	new webpack.WatchIgnorePlugin([CLIENT_ASSETS_MANIFEST])
 ]
 
-const build = Object.assign({}, baseWebpackConfig, {
-	// entry: config.entry.concat(['webpack/hot/poll?1000']),
-	devtool: 'eval-source-map',
+export default Object.assign({}, baseWebpackConfig, {
+	entry: [baseWebpackConfig.entry, 'webpack/hot/poll?300'],
 	watch: true,
 	plugins: baseWebpackConfig.plugins.concat(plugins)
 })
-
-export default build

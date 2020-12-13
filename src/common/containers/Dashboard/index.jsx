@@ -1,65 +1,34 @@
-import React, {Component} from 'react'
-import {connect} from 'react-redux'
-import PropTypes from 'prop-types'
-import {Loader} from 'semantic-ui-react'
+// @flow
+import React from 'react'
 import {Helmet} from 'react-helmet'
-//
-import DashboardComponent from './components'
-import {GET_POSTS} from 'actions/posts'
+import {Grid, Header} from 'semantic-ui-react'
+import {FormattedMessage} from 'react-intl'
 
-class Dashboard extends Component {
-	static propTypes = {
-		posts: PropTypes.object,
-		postsLoaded: PropTypes.bool,
-		postsLoading: PropTypes.bool,
-		count: PropTypes.number,
-		getPosts: PropTypes.func.isRequired
-	}
-
-	componentWillMount () {
-		this.props.getPosts()
-	}
-
-	render () {
-		const {posts, postsLoaded, postsLoading, count} = this.props
-
-		return (
-			<div>
-				<Helmet>
-					<title>Dashboard</title>
-				</Helmet>
-				{postsLoaded
-					? <DashboardComponent
-						{...{posts, postsLoaded, postsLoading, count}}
-					/>
-					: <Loader active>Loading...</Loader>}
-			</div>
-		)
-	}
+const Dashboard = () => {
+	return (
+		<div>
+			<Helmet>
+				<title>Suicrux:Dashboard</title>
+			</Helmet>
+			<Grid columns={1}>
+				<Grid.Row centered>
+					<Grid.Column width={16}>
+						<Header as="h1">Suicrux</Header>
+						<Header as="h2">Ultimate universal starter with lazy-loading, SSR and i18n</Header>
+						<p>
+							<FormattedMessage id="Dashboard.p" />
+						</p>
+						<p>
+							<FormattedMessage id="Dashboard.p1" />
+						</p>
+						<p>
+							<FormattedMessage id="Dashboard.p2" />
+						</p>
+					</Grid.Column>
+				</Grid.Row>
+			</Grid>
+		</div>
+	)
 }
 
-function mapStateToProps (state) {
-	const {posts} = state.entities
-	const postsLoaded = posts.isLoaded
-	const postsLoading = posts.isLoading
-	const items = posts.entities
-	const {count} = posts
-
-	return {
-		posts: items,
-		postsLoading,
-		postsLoaded,
-		count
-	}
-}
-
-function mapDispatchToProps (dispatch) {
-	return {
-		getPosts: async () => {
-			const result = await GET_POSTS()
-			return dispatch(result)
-		}
-	}
-}
-
-export default connect(mapStateToProps, mapDispatchToProps)(Dashboard)
+export default Dashboard

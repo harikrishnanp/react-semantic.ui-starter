@@ -1,47 +1,43 @@
+// @flow
 import {
-	UI_OPEN_SIDEBAR,
-	UI_CLOSE_SIDEBAR,
-	UI_WINDOW_RESIZE,
-	LOCATION_CHANGE,
-	APPLICATION_INIT
-} from 'actions'
+	UI_TOGGLE_SIDEBAR,
+	UI_WINDOW_RESIZE
+} from 'actions/layout'
+import {LOCATION_CHANGE} from 'actions/common'
+import {computeLayoutMobileStatuses} from 'selectors'
 
-export const initialState = {
-	sidebarOpened: false,
-	isMobile: false,
-	isMobileXS: false,
-	isMobileSM: false
+export type State = {
+	sidebarOpened: boolean,
+	innerWidth?: number
 }
 
-export function layout (state = initialState, action) {
-	const computeMobileStatuses = () => {
-		const innerWidth = process.env.BROWSER ? window.innerWidth : 1024
-		const isMobile = innerWidth < 1025 // 1024px - is the main breakpoint in UI
-		const isMobileXS = innerWidth < 481
-		const isMobileSM = innerWidth > 480 && innerWidth < 767
-		return {isMobileSM, isMobileXS, isMobile}
-	}
+// NOTE: sidebar is opened by default and rendered as visible on server
+export const initialState: State = {
+	sidebarOpened: true,
+	innerWidth: 993
+}
+
+export function layout (state: State = initialState, action): State {
 	switch (action.type) {
-	case APPLICATION_INIT:
 	case UI_WINDOW_RESIZE: {
-		const {isMobile, isMobileSM, isMobileXS} = computeMobileStatuses()
+		const {innerWidth} = action.payload
+		const {isMobile} = computeLayoutMobileStatuses({innerWidth})
+
 		return {
-			...state,
-			isMobile,
-			isMobileSM,
-			isMobileXS
+			innerWidth,
+			sidebarOpened: !isMobile
 		}
 	}
-	case UI_OPEN_SIDEBAR:
+	case UI_TOGGLE_SIDEBAR:
 		return {
 			...state,
-			sidebarOpened: true
+			sidebarOpened: !state.sidebarOpened
 		}
 	case LOCATION_CHANGE:
-	case UI_CLOSE_SIDEBAR:
+		const {isMobile} = computeLayoutMobileStatuses(state)
 		return {
 			...state,
-			sidebarOpened: false
+			sidebarOpened: !isMobile
 		}
 	default:
 		return state
